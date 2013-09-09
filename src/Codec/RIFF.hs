@@ -43,7 +43,7 @@ module Codec.RIFF
        ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad as M
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
@@ -157,7 +157,10 @@ instance Binary Chunk where
     <$> get
     <*> (getWord32le >>= getByteString . fromIntegral)
 
-  put = undefined
+  put Chunk {..} = do
+    put chunkType
+    put $ BS.length chunkData
+    putByteString   chunkData
 
 {-----------------------------------------------------------------------
   List
@@ -181,17 +184,23 @@ instance BinarySize List where
 
 getListBody :: Get List
 getListBody = do
-  payloadSize <- (\sz -> fromIntegral sz - 4) <$> getWord32le
+  payloadSize <- (\sz -> fromIntegral sz - binarySize listCC) <$> getWord32le
   List payloadSize <$> get <*> getSized payloadSize
+
+putListBody :: List -> Put
+putListBody List {..} = do
+  put (listSize + binarySize listCC)
+  put  listType
+  M.mapM_ put children
 
 instance Binary List where
   get = do
     checkCC listCC
     getListBody
 
-  put List {..} = undefined
---    put listCC
---    put
+  put lst = do
+    put  listCC
+    putListBody lst
 
 lookupList :: FourCC -> [Atom] -> ConvertResult Atom
 lookupList ty (a : as)
@@ -260,7 +269,9 @@ instance Binary RIFF where
     checkCC riffCC
     RIFF <$> getListBody
 
-  put = undefined
+  put (RIFF lst) = do
+    put riffCC
+    put lst
 
 -- TODO filter JUNK chunks
 
