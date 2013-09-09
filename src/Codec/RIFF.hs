@@ -44,6 +44,7 @@ module Codec.RIFF
 
          -- * RIFF
        , RIFF (..)
+       , ppRIFF
        ) where
 
 import Control.Applicative
@@ -298,3 +299,6 @@ ppList List {..}
 ppAtom :: Atom -> Doc
 ppAtom (AChunk chunk) = ppChunk chunk
 ppAtom (AList  list)  = ppList  list
+
+ppRIFF :: RIFF -> Doc
+ppRIFF (RIFF lst) = ppList lst
