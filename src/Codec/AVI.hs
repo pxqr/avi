@@ -15,7 +15,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
-module Codec.RIFF.AVI
+module Codec.AVI
        ( Rect (..)
        , StreamHeader (..)
        , StreamFormat
@@ -38,7 +38,7 @@ import Data.String
 import Data.Text as T
 import Data.Typeable
 
-import Codec.RIFF
+import Codec.AVI.RIFF
 
 {-----------------------------------------------------------------------
   Stream

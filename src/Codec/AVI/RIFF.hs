@@ -24,7 +24,7 @@
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
-module Codec.RIFF
+module Codec.AVI.RIFF
        ( FourCC
 
          -- * Chunk
