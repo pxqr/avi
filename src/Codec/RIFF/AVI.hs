@@ -242,7 +242,7 @@ data AVI = AVI
   } deriving (Show, Typeable)
 
 instance Convertible RIFF AVI where
-  safeConvert xs @ List {..}
+  safeConvert xs @ (RIFF List {..})
     | listType /= avi
     = convError ("unexpected list type: " ++ show listType) xs
     |    otherwise    = AVI
@@ -254,6 +254,6 @@ instance Convertible RIFF AVI where
 instance Binary AVI where
   get = do
     xs <- get
-    either (fail . prettyConvertError) return $ safeConvert (xs :: List)
+    either (fail . prettyConvertError) return $ safeConvert (xs :: RIFF)
 
   put = undefined

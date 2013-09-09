@@ -39,10 +39,11 @@ module Codec.RIFF
        , ppAtom
        , atomType
 
-       , RIFF
+       , RIFF (..)
        ) where
 
 import Control.Applicative
+import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
@@ -60,12 +61,38 @@ import Text.PrettyPrint
 --   though the API users shouldn't take care of it.
 
 {-----------------------------------------------------------------------
+  Size helpers
+-----------------------------------------------------------------------}
+
+class BinarySize a where
+  binarySize :: a -> Int
+
+instance BinarySize Int where
+  binarySize _ = 4
+
+instance BinarySize ByteString where
+  {-# INLINE binarySize #-}
+  binarySize bs = 4 + BS.length bs
+
+getSized :: (Binary a, BinarySize a) => Int -> Get [a]
+getSized n
+  |   n <= 0  = pure []
+  | otherwise = do
+    x  <- get -- :: Get a
+    xs <- getSized (n - binarySize x)
+    pure (x : xs)
+
+{-----------------------------------------------------------------------
   Four Character Code
 -----------------------------------------------------------------------}
 
 -- | Compact representation for Four Character Code.
 newtype FourCC = FourCC { fourCC :: Word32 }
                  deriving (Eq, Ord, Typeable)
+
+instance BinarySize FourCC where
+  {-# INLINE binarySize #-}
+  binarySize _ = 4
 
 instance IsString FourCC where
   fromString [a, b, c, d] = FourCC $
@@ -91,6 +118,12 @@ instance Binary FourCC where
   put = putWord32le . fourCC
   {-# INLINE put #-}
 
+checkCC :: FourCC -> Get ()
+checkCC ex = do
+  ac <- get
+  unless (ac == ex) $ do
+    fail $ "expected " ++ show ex ++ " but actual " ++ show ac
+
 {-----------------------------------------------------------------------
   Chunk
 -----------------------------------------------------------------------}
@@ -98,12 +131,16 @@ instance Binary FourCC where
 data Chunk = Chunk
   { chunkType :: {-# UNPACK #-} !FourCC
   , chunkData :: {-# UNPACK #-} !ByteString
-  } deriving Typeable
+  } deriving (Eq, Typeable)
+
+instance BinarySize Chunk where
+  {-# INLINE binarySize #-}
+  binarySize Chunk {..} = binarySize chunkType + binarySize chunkData
 
 -- | for Show instance only
 data ChunkInfo = ChunkInfo
   { ckType :: {-# UNPACK #-} !FourCC
-  , ckSize   :: {-# UNPACK #-} !Int
+  , ckSize :: {-# UNPACK #-} !Int
   } deriving Show
 
 chunkInfo :: Chunk -> ChunkInfo
@@ -127,19 +164,34 @@ instance Binary Chunk where
 -----------------------------------------------------------------------}
 
 data List = List
-  { listSize :: {-# UNPACK #-} !Int
+  { listSize :: {-# UNPACK #-} !Int    -- TODO remove reduntant field in list
   , listType :: {-# UNPACK #-} !FourCC
   , children :: [Atom]
-  } deriving (Show, Typeable)
+  } deriving (Show, Eq, Typeable)
+
+listCC :: FourCC
+listCC = "LIST"
+
+instance BinarySize List where
+  binarySize List {..}
+   = binarySize listCC
+   + binarySize listSize
+   + binarySize listType
+   + listSize
+
+getListBody :: Get List
+getListBody = do
+  payloadSize <- (\sz -> fromIntegral sz - 4) <$> getWord32le
+  List payloadSize <$> get <*> getSized payloadSize
 
 instance Binary List where
   get = do
-    get :: Get FourCC
-    List <$> (fromIntegral <$> getWord32le)
-         <*> get
-         <*> many get
+    checkCC listCC
+    getListBody
 
-  put = undefined
+  put List {..} = undefined
+--    put listCC
+--    put
 
 lookupList :: FourCC -> [Atom] -> ConvertResult Atom
 lookupList ty (a : as)
@@ -153,9 +205,15 @@ lookupList ty e      = convError ("could not lookup: " ++ show ty) e
 
 data AtomG a = AChunk !a
              | AList  !List
-               deriving (Show, Functor, Foldable, Traversable, Typeable)
+               deriving ( Show, Eq, Typeable
+                        , Functor, Foldable, Traversable
+                        )
 
 type Atom = AtomG Chunk
+
+instance BinarySize Atom where
+  binarySize (AChunk c) = binarySize c
+  binarySize (AList  l) = binarySize l
 
 instance Convertible List Atom where
   {-# INLINE safeConvert #-}
@@ -176,23 +234,35 @@ instance Convertible Atom Chunk where
   safeConvert     (AChunk c) = return c
 
 instance Binary (AtomG Chunk) where
-  get = do
-    bs <- lookAhead get
-    if bs == "RIFF" || bs == ("LIST" :: FourCC)
-      then AList  <$> get
-      else AChunk <$> get
+  get = AList  <$> get
+    <|> AChunk <$> get
 
-  put = undefined
+  put (AList  l) = put l
+  put (AChunk c) = put c
 
 atomType :: Atom -> FourCC
 atomType (AChunk Chunk {..}) = chunkType
 atomType (AList  List  {..}) = listType
 
+{-----------------------------------------------------------------------
+  RIFF
+-----------------------------------------------------------------------}
+
 -- | Root atom.
-type RIFF = List
+newtype RIFF = RIFF List
+               deriving (Show, Eq, Typeable)
+
+riffCC :: FourCC
+riffCC = "RIFF"
+
+instance Binary RIFF where
+  get = do
+    checkCC riffCC
+    RIFF <$> getListBody
+
+  put = undefined
 
 -- TODO filter JUNK chunks
-
 
 {-----------------------------------------------------------------------
   Pretty printing
