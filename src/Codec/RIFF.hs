@@ -27,18 +27,22 @@
 module Codec.RIFF
        ( FourCC
 
+         -- * Chunk
        , Chunk (..)
        , ppChunk
 
+         -- * List
        , List  (..)
        , ppList
        , lookupList
 
+         -- * Atom
        , Atom
        , AtomG (..)
        , ppAtom
        , atomType
 
+         -- * RIFF
        , RIFF (..)
        ) where
 
