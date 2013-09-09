@@ -20,12 +20,14 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.RIFF
-       ( FourCC
+       ( BinarySize (..) -- TODO more to Internal.hs
+       , FourCC
 
          -- * Chunk
        , Chunk (..)
@@ -61,6 +63,7 @@ import Data.String
 import Data.Traversable
 import Data.Typeable
 import Text.PrettyPrint
+import Foreign.Storable
 
 --    All multibyte integers encoded in little-endian byte order,
 --   though the API users shouldn't take care of it.
@@ -72,12 +75,20 @@ import Text.PrettyPrint
 class BinarySize a where
   binarySize :: a -> Int
 
+  default binarySize :: Storable a => a -> Int
+  binarySize = sizeOf
+
+instance BinarySize Word16
+instance BinarySize Word32
+instance BinarySize Word64
+
 instance BinarySize Int where
   binarySize _ = 4
 
 instance BinarySize ByteString where
   {-# INLINE binarySize #-}
   binarySize bs = 4 + BS.length bs
+
 
 getSized :: (Binary a, BinarySize a) => Int -> Get [a]
 getSized n

@@ -25,7 +25,7 @@ library
                      , Codec.AVI.RIFF
   -- other-modules:
   build-depends:       base        == 4.6.*
-                     , binary      == 0.7.*
+                     , binary      >= 0.6 && < 0.8
                      , bytestring  == 0.10.*
                      , convertible == 1.0.*
                      , pretty      == 1.1.*

@@ -39,6 +39,7 @@ import Data.Text as T
 import Data.Typeable
 
 import Codec.AVI.RIFF
+import Codec.AVI.Stream.Format
 
 {-----------------------------------------------------------------------
   Stream
@@ -113,6 +114,9 @@ data StreamHeader = StreamHeader
   , streamFrame         :: !Rect
   } deriving (Show, Typeable)
 
+-- |
+-- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318183(v=vs.85).aspx>
+--
 instance Binary StreamHeader where
   get = StreamHeader
     <$> get
@@ -143,8 +147,8 @@ instance Convertible Chunk StreamHeader where
 instance Convertible Atom StreamHeader where
   safeConvert = convertVia (undefined :: Chunk)
 
+type StreamFormat = BitmapInfo
 type StreamName   = Text
-type StreamFormat = Chunk
 type StreamIndex  = Chunk
 type StreamData   = Chunk
 
@@ -235,6 +239,13 @@ instance Convertible Chunk Header where
 
 instance Convertible Atom Header where
   safeConvert = convertVia (undefined :: Chunk)
+
+data Idx1 = Idx1
+  { chunkId     :: {-# UNPACK #-} !Word32
+  , idx1Flags   :: {-# UNPACK #-} !Word32
+  , chunkOffset :: {-# UNPACK #-} !Word32
+  , chunkLength :: {-# UNPACK #-} !Word32
+  } deriving Show
 
 data AVI = AVI
   { header  :: Header
