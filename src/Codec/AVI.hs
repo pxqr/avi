@@ -17,14 +17,9 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI
        ( Rect (..)
-       , StreamHeader (..)
-       , StreamFormat
-       , StreamData
-       , StreamName
-       , StreamIndex
        , Stream (..)
 
-       , Header (..)
+       , Codec.AVI.Header (..)
        , AVI (..)
        ) where
 
@@ -35,7 +30,6 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.List as L
-import Data.String
 import Data.Text as T
 import Data.Typeable
 
@@ -44,9 +38,6 @@ import Codec.AVI.Stream.Format as Stream
 import Codec.AVI.Stream.Header as Stream
 
 
-
-
-type StreamFormat = Format
 type StreamName   = Text
 type StreamIndex  = Chunk
 type StreamData   = Chunk
@@ -55,8 +46,8 @@ streamCC :: FourCC
 streamCC = "strl"
 
 data Stream = Stream
-  { streamHeader :: !StreamHeader
-  , streamFormat :: !StreamFormat
+  { streamHeader :: !Stream.Header
+  , streamFormat :: !Stream.Format
   , streamData   :: !(Maybe StreamData)
   , streamName   :: !(Maybe StreamName)
   , streamIndex  :: !(Maybe StreamIndex)
@@ -115,8 +106,8 @@ data Header = Header
   , reserved            :: {-# UNPACK #-} !Word32
   } deriving (Show, Typeable)
 
-instance Binary Header where
-  get = Header
+instance Binary Codec.AVI.Header where
+  get = Codec.AVI.Header
     <$> getWord32le
     <*> getWord32le
     <*> getWord32le
@@ -134,12 +125,12 @@ instance Binary Header where
 
   put = undefined
 
-instance Convertible Chunk Header where
+instance Convertible Chunk Codec.AVI.Header where
   safeConvert ck @ Chunk {..}
     | chunkType == "avih" = return $ decode $ LBS.fromChunks [chunkData]
     |       otherwise     = convError ("unexpected" ++ show chunkType) ck
 
-instance Convertible Atom Header where
+instance Convertible Atom Codec.AVI.Header where
   safeConvert = convertVia (undefined :: Chunk)
 
 data Idx1 = Idx1
@@ -150,7 +141,7 @@ data Idx1 = Idx1
   } deriving Show
 
 data AVI = AVI
-  { header  :: Header
+  { header  :: Codec.AVI.Header
   , streams :: [Stream]
   } deriving (Show, Typeable)
 

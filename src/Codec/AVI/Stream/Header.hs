@@ -6,8 +6,8 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.Stream.Header
        ( headerCC
-       , Rect (..)
-       , StreamHeader (..)
+       , Rect   (..)
+       , Header (..)
        ) where
 
 import Control.Applicative
@@ -82,7 +82,7 @@ instance Binary Rect where
 headerCC :: FourCC
 headerCC = "strh"
 
-data StreamHeader = StreamHeader
+data Header = Header
   { streamType          :: !StreamType
 
     -- | Codec to be used.
@@ -111,8 +111,8 @@ data StreamHeader = StreamHeader
 -- |
 -- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318183(v=vs.85).aspx>
 --
-instance Binary StreamHeader where
-  get = StreamHeader
+instance Binary Header where
+  get = Header
     <$> get
     <*> get
     <*> getWord32le
@@ -133,8 +133,8 @@ instance Binary StreamHeader where
 
   put = undefined
 
-instance Convertible Chunk StreamHeader where
+instance Convertible Chunk Header where
   safeConvert = decodeChunk headerCC
 
-instance Convertible Atom StreamHeader where
+instance Convertible Atom Header where
   safeConvert = convertVia (undefined :: Chunk)
