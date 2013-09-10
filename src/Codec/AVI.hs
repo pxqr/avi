@@ -35,14 +35,12 @@ import Codec.AVI.RIFF
 import Codec.AVI.Stream
 
 {-----------------------------------------------------------------------
-  AVI
+  AVI Header
 -----------------------------------------------------------------------}
 
-avi :: FourCC
-avi = "AVI "
-
-avix :: FourCC
-avix = "AVIX"
+-- | AVI header chunk identifier.
+aviHeaderCC :: FourCC
+aviHeaderCC = "avih"
 
 data Flag = HasIndex
           | MustUseIndex
@@ -94,11 +92,15 @@ instance Binary Codec.AVI.Header where
   put = undefined
 
 instance Convertible Chunk Codec.AVI.Header where
-  safeConvert ck @ Chunk {..}
-    | chunkType == "avih" = return $ decode $ LBS.fromChunks [chunkData]
-    |       otherwise     = convError ("unexpected" ++ show chunkType) ck
+  safeConvert = decodeChunk aviHeaderCC
 
 instance Convertible Atom Codec.AVI.Header where
+  safeConvert = convertVia (undefined :: Chunk)
+
+instance Convertible Codec.AVI.Header Chunk where
+  safeConvert = encodeChunk aviHeaderCC
+
+instance Convertible Codec.AVI.Header Atom where
   safeConvert = convertVia (undefined :: Chunk)
 
 data Idx1 = Idx1
@@ -108,6 +110,21 @@ data Idx1 = Idx1
   , chunkLength :: {-# UNPACK #-} !Word32
   } deriving Show
 
+{-----------------------------------------------------------------------
+  AVI
+-----------------------------------------------------------------------}
+
+-- | AVI LIST identifier.
+aviCC :: FourCC
+aviCC = "AVI "
+
+avix :: FourCC
+avix = "AVIX"
+
+-- | Identifier of stream LIST.
+headerListCC :: FourCC
+headerListCC = "hdrl"
+
 data AVI = AVI
   { header  :: Codec.AVI.Header
   , streams :: [Stream]
@@ -115,13 +132,19 @@ data AVI = AVI
 
 instance Convertible RIFF AVI where
   safeConvert xs @ (RIFF List {..})
-    | listType /= avi
+    | listType /= aviCC
     = convError ("unexpected list type: " ++ show listType) xs
     |    otherwise    = AVI
-      <$> (safeConvert =<< lookupList "avih" hdrl)
+      <$> (safeConvert =<< lookupList aviHeaderCC hdrl)
       <*> (mapM safeConvert $ L.filter ((streamCC ==) . atomType) hdrl)
     where
-      Right (AList (List {children = hdrl})) = lookupList "hdrl" children
+      Right (AList (List {children = hdrl})) = lookupList headerListCC children
+
+instance Convertible AVI RIFF where
+  safeConvert AVI {..} = pure $ RIFF $ list aviCC
+    [ convert header
+    , convert $ list headerListCC $ L.map convert streams
+    ]
 
 instance Binary AVI where
   get = do

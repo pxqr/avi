@@ -65,9 +65,9 @@ instance Convertible List Stream where
     |       otherwise      = Stream
       <$> (safeConvert =<< lookupList headerCC children)
       <*> (safeConvert =<< lookupList formatCC children)
-      <*> pure Nothing
-      <*> pure Nothing
-      <*> pure Nothing
+      <*> pure Nothing -- TODO
+      <*> pure Nothing -- TODO
+      <*> pure Nothing -- TODO
 
 instance Convertible Atom Stream where
   safeConvert = convertVia (undefined :: List)
