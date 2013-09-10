@@ -1,3 +1,14 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  stable
+--   Portability :  portable
+--
+--   Each stream contain mandatory /stream header chunk/, one per
+--   stream list. The stream header chunk contains data-independent
+--   information about the stream.
+--
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
@@ -6,6 +17,7 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.Stream.Header
        ( headerCC
+       , StreamType
        , Rect   (..)
        , Header (..)
        ) where
@@ -27,12 +39,13 @@ import Codec.AVI.RIFF
 --  Stream Type
 -----------------------------------------------------------------------}
 
+-- | Types of the data stream could contain.
 data StreamType
-  = Audio
-  | Midi
-  | Video
-  | Text
-  | UnknownType Text
+  = Audio -- ^ Audio stream.
+  | Midi  -- ^ MIDI  stream.
+  | Video -- ^ Video stream.
+  | Text  -- ^ Text  stream (subtitles).
+  | UnknownType Text -- ^ Not recognized stream type.
     deriving (Show, Read, Eq, Ord)
 
 instance Binary StreamType where
@@ -58,11 +71,12 @@ instance Binary StreamType where
 --  Rectangle
 -----------------------------------------------------------------------}
 
+-- | Rectangle used to specify relative location of video or text stream.
 data Rect = Rect
-  { left   :: {-# UNPACK #-} !Int
-  , top    :: {-# UNPACK #-} !Int
-  , right  :: {-# UNPACK #-} !Int
-  , bottom :: {-# UNPACK #-} !Int
+  { left   :: {-# UNPACK #-} !Int -- ^ Left   offset in pixels;
+  , top    :: {-# UNPACK #-} !Int -- ^ Top    offset in pixels;
+  , right  :: {-# UNPACK #-} !Int -- ^ Right  offset in pixels;
+  , bottom :: {-# UNPACK #-} !Int -- ^ Bottom offset in pixels.
   } deriving (Show, Typeable)
 
 instance Binary Rect where
@@ -82,38 +96,66 @@ instance Binary Rect where
 --  Header
 -----------------------------------------------------------------------}
 
+-- | Stream header chunk identifier.
 headerCC :: FourCC
 headerCC = "strh"
 
+-- | Stream header (or AVISTREAMHEADER) contains information about one
+-- stream in an AVI file. For reference see:
+--
+-- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318183(v=vs.85).aspx>
+--
 data Header = Header
-  { streamType          :: !StreamType
+  { -- | Type of the data contained in the stream.
+    streamType          :: !StreamType
 
     -- | Codec to be used.
   , streamHandler       :: {-# UNPACK #-} !FourCC
-    -- |
   , streamFlags         :: {-# UNPACK #-} !Word32
+    -- | Priorities can be used to set default audio stream for example.
   , streamPriority      :: {-# UNPACK #-} !Word16
+    -- | Language tag.
   , streamLanguage      :: {-# UNPACK #-} !Word16
   , streamInitialFrames :: {-# UNPACK #-} !Word32
-    -- |
+
+    -- | Used with 'streamRate' to specify the time scale that this
+    -- stream will use. 'streamRate' / 'streamScale' =
+    -- streamSamplesPerSec, specifies:
+    --
+    --   * for video stream — frame rate;
+    --
+    --   * for audio stream — sample rate.
+    --
   , streamScale         :: {-# UNPACK #-} !Word32
+
+    -- TODO streamSamplesPerSec :: Ratio Int ?
+
+    -- | See 'streamScale'.
   , streamRate          :: {-# UNPACK #-} !Word32
 
     -- | Start time of stream indicates the number of silent frames.
   , streamStart         :: {-# UNPACK #-} !Word32
+    -- | Length of this strem in 'streamRate' / 'streamScale' units.
   , streamLength        :: {-# UNPACK #-} !Word32
 
     -- | Size of block necessary to store blocks of that stream.
   , streamSuggestedBufferSize :: {-# UNPACK #-} !Word32
-    -- | Quality of the stream.
+
+    -- | Quality of the stream typically passed to the compression
+    -- software. If equals to -1, drivers use the default quality
+    -- value.
   , streamQuality       :: {-# UNPACK #-} !Word32
+
+    -- | Specifies the size of a single sample of data, equals to zero
+    -- if the samples ca vary in size.
   , streamSampleSize    :: {-# UNPACK #-} !Word32
+
+    -- | Destination rectablee for a text or video stream within the
+    -- movie rectangle specified by the width and height members of
+    -- the AVI main header structure.
   , streamFrame         :: !Rect
   } deriving (Show, Typeable)
 
--- |
--- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318183(v=vs.85).aspx>
---
 instance Binary Header where
   get = Header
     <$> get
