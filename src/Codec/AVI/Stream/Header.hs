@@ -17,7 +17,7 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.Stream.Header
        ( headerCC
-       , StreamType
+       , StreamType (..)
        , Rect   (..)
        , Header (..)
        ) where
