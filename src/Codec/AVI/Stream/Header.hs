@@ -13,6 +13,7 @@ module Codec.AVI.Stream.Header
 import Control.Applicative
 import Data.Binary
 import Data.Binary.Get
+import Data.Binary.Put
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.String
@@ -71,9 +72,11 @@ instance Binary Rect where
     <*> (fromIntegral <$> getWord16le)
     <*> (fromIntegral <$> getWord16le)
 
-  put = undefined
-
-
+  put Rect {..} = do
+    putWord16le $ fromIntegral left
+    putWord16le $ fromIntegral top
+    putWord16le $ fromIntegral right
+    putWord16le $ fromIntegral bottom
 
 {-----------------------------------------------------------------------
 --  Header
@@ -131,7 +134,25 @@ instance Binary Header where
     <*> getWord32le
     <*> get
 
-  put = undefined
+  put Header {..} = do
+    put streamType
+    put streamHandler
+
+    putWord32le streamFlags
+    putWord16le streamPriority
+    putWord16le streamLanguage
+    putWord32le streamInitialFrames
+
+    putWord32le streamScale
+    putWord32le streamRate
+
+    putWord32le streamStart
+    putWord32le streamLength
+
+    putWord32le streamSuggestedBufferSize
+    putWord32le streamQuality
+    putWord32le streamSampleSize
+    put streamFrame
 
 instance Convertible Chunk Header where
   safeConvert = decodeChunk headerCC
