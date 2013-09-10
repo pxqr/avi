@@ -23,7 +23,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Codec.AVI
                      , Codec.AVI.RIFF
-  other-modules:       Codec.AVI.Stream.Header
+  other-modules:       Codec.AVI.Stream
+                     , Codec.AVI.Stream.Header
                      , Codec.AVI.Stream.Format
   build-depends:       base        == 4.6.*
                      , binary      >= 0.6 && < 0.8
