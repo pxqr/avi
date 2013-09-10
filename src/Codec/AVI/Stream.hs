@@ -1,3 +1,13 @@
+-- |
+--   Copyright   :  (c) Sam Truzjan 2013
+--   License     :  BSD3
+--   Maintainer  :  pxqr.sta@gmail.com
+--   Stability   :  stable
+--   Portability :  non-portable (depends on Codec.AVI.RIFF)
+--
+--   For stream header reference see:
+-- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318189(v=vs.85).aspx#AVI_STREAM_HEADERS>
+--
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -24,14 +34,27 @@ type StreamName   = Text
 type StreamIndex  = Chunk
 type StreamData   = Chunk
 
+-- | Stream list identifier.
 streamCC :: FourCC
 streamCC = "strl"
 
+-- TODO s/Stream/StreamInfo ?
+
+-- |
 data Stream = Stream
-  { streamHeader :: !Stream.Header
+  { -- | Data independent stream information.
+    streamHeader :: !Stream.Header
+
+    -- | Format of the stream data.
   , streamFormat :: !Stream.Format
+
+    -- | Format of content the stream data chunk is codec driver dependent.
+    --   Drivers use this information for configuration.
   , streamData   :: !(Maybe StreamData)
+
+    -- | Optional stream name used to display to user.
   , streamName   :: !(Maybe StreamName)
+
   , streamIndex  :: !(Maybe StreamIndex)
   } deriving (Show, Typeable)
 
@@ -47,3 +70,5 @@ instance Convertible List Stream where
 
 instance Convertible Atom Stream where
   safeConvert = convertVia (undefined :: List)
+
+-- TODO add binary instance
