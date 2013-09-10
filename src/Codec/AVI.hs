@@ -34,12 +34,13 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as LBS
 import Data.Convertible.Base
 import Data.Convertible.Utils
+import Data.List as L
 import Data.String
 import Data.Text as T
 import Data.Typeable
 
 import Codec.AVI.RIFF
-import Codec.AVI.Stream.Format
+import Codec.AVI.Stream.Format as Stream
 
 {-----------------------------------------------------------------------
   Stream
@@ -87,6 +88,9 @@ instance Binary Rect where
     <*> (fromIntegral <$> getWord16le)
 
   put = undefined
+
+headerCC :: FourCC
+headerCC = "strh"
 
 data StreamHeader = StreamHeader
   { streamType          :: !StreamType
@@ -147,10 +151,13 @@ instance Convertible Chunk StreamHeader where
 instance Convertible Atom StreamHeader where
   safeConvert = convertVia (undefined :: Chunk)
 
-type StreamFormat = BitmapInfo
+type StreamFormat = Format
 type StreamName   = Text
 type StreamIndex  = Chunk
 type StreamData   = Chunk
+
+streamCC :: FourCC
+streamCC = "strl"
 
 data Stream = Stream
   { streamHeader :: !StreamHeader
@@ -162,10 +169,10 @@ data Stream = Stream
 
 instance Convertible List Stream where
   safeConvert xs @ List {..}
-    | listType /= "strl" = convError "not expected list four CC" xs
-    |      otherwise     = Stream
-      <$> (safeConvert =<< lookupList "strh" children)
-      <*> (safeConvert =<< lookupList "strf" children)
+    | listType /= streamCC = convError "unexpected list four CC" xs
+    |       otherwise      = Stream
+      <$> (safeConvert =<< lookupList headerCC children)
+      <*> (safeConvert =<< lookupList formatCC children)
       <*> pure Nothing
       <*> pure Nothing
       <*> pure Nothing
@@ -249,7 +256,7 @@ data Idx1 = Idx1
 
 data AVI = AVI
   { header  :: Header
-  , streams :: Stream
+  , streams :: [Stream]
   } deriving (Show, Typeable)
 
 instance Convertible RIFF AVI where
@@ -258,7 +265,7 @@ instance Convertible RIFF AVI where
     = convError ("unexpected list type: " ++ show listType) xs
     |    otherwise    = AVI
       <$> (safeConvert =<< lookupList "avih" hdrl)
-      <*> (safeConvert =<< lookupList "strl" hdrl)
+      <*> (mapM safeConvert $ L.filter ((streamCC ==) . atomType) hdrl)
     where
       Right (AList (List {children = hdrl})) = lookupList "hdrl" children
 

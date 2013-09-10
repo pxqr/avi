@@ -6,26 +6,36 @@
 --   Portability :  portable
 --
 --
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.Stream.Format
-       ( BitmapInfo (..)
+       ( BitmapInfo  (..)
+       , WaveFormatX (..)
+       , Format      (..)
+       , formatCC
        ) where
 
 import Control.Applicative
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.ByteString.Lazy as LBS
+import Data.ByteString as BS
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.Typeable
 
 import Codec.AVI.RIFF
 
+formatCC :: FourCC
+formatCC = "strf"
+
+{-----------------------------------------------------------------------
+-- BITMAPINFOHEADER
+-----------------------------------------------------------------------}
 
 -- | BitmapInfo is used for stream format for video stream. For
 -- BITMAPINFOHEADER reference see:
@@ -100,12 +110,12 @@ instance Binary BitmapInfo where
     putWord32le biClrUsed
     putWord32le biClrImportant
 
-
 instance Convertible Chunk BitmapInfo where
-  safeConvert Chunk {..} = return $ decode $ LBS.fromChunks [chunkData]
+  safeConvert = decodeChunk formatCC
 
-instance Convertible Atom BitmapInfo where
-  safeConvert = convertVia (undefined :: Chunk)
+{-----------------------------------------------------------------------
+-- WaveFormatX
+-----------------------------------------------------------------------}
 
 -- |
 -- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd390970(v=vs.85).aspx>
@@ -123,7 +133,8 @@ data WaveFormatX = WaveFormatX
   } deriving (Show, Eq, Typeable)
 
 instance BinarySize WaveFormatX where
-  binarySize WaveFormatX {..}
+  binarySize WaveFormatX {..} = 18
+  {-
     = binarySize formatTag
     + binarySize channels
 
@@ -133,3 +144,43 @@ instance BinarySize WaveFormatX where
     + binarySize blockAlign
     + binarySize bitsPerSample
     + binarySize cbSize
+  -}
+
+instance Binary WaveFormatX where
+  get = WaveFormatX
+    <$> getWord16le <*> getWord16le
+    <*> getWord32le <*> getWord32le
+    <*> getWord16le <*> getWord16le <*> getWord16le
+
+  put WaveFormatX {..} = do
+    putWord16le formatTag
+    putWord16le channels
+
+    putWord32le samplesPerSec
+    putWord32le avgBytesPerSec
+
+    putWord16le blockAlign
+    putWord16le bitsPerSample
+    putWord16le cbSize
+
+instance Convertible Chunk WaveFormatX where
+  safeConvert = decodeChunk formatCC
+
+{-----------------------------------------------------------------------
+-- WaveFormatX
+-----------------------------------------------------------------------}
+
+data Format
+  = VideoFormat BitmapInfo
+  | AudioFormat WaveFormatX
+  deriving (Show, Eq, Typeable)
+
+instance Convertible Chunk Format where
+  safeConvert c @ Chunk {..} =
+    case BS.length chunkData of
+      40 -> VideoFormat <$> safeConvert c
+      18 -> AudioFormat <$> safeConvert c
+      n  -> convError ("unexpected chunk size" ++ show n) c
+
+instance Convertible Atom Format where
+  safeConvert = convertVia (undefined :: Chunk)

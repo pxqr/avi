@@ -32,6 +32,7 @@ module Codec.AVI.RIFF
          -- * Chunk
        , Chunk (..)
        , ppChunk
+       , decodeChunk
 
          -- * List
        , List  (..)
@@ -56,6 +57,7 @@ import Data.Binary.Get
 import Data.Binary.Put
 import Data.Bits
 import Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import Data.Convertible.Base
 import Data.Foldable
 import Data.List as L
@@ -177,6 +179,11 @@ instance Binary Chunk where
     put chunkType
     put $ BS.length chunkData
     putByteString   chunkData
+
+decodeChunk :: (Typeable a, Binary a) => FourCC -> Chunk -> ConvertResult a
+decodeChunk ex c @ Chunk {..}
+  | ex == chunkType = return $ decode $ LBS.fromChunks [chunkData]
+  |    otherwise    = convError "unexpected chunk type" c
 
 {-----------------------------------------------------------------------
   List
