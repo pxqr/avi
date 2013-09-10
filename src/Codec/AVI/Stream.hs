@@ -20,6 +20,7 @@ module Codec.AVI.Stream
        ) where
 
 import Control.Applicative
+import Data.Binary
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.Text as T
@@ -71,4 +72,17 @@ instance Convertible List Stream where
 instance Convertible Atom Stream where
   safeConvert = convertVia (undefined :: List)
 
--- TODO add binary instance
+instance Convertible Stream List where
+  safeConvert Stream {..} = pure $ list streamCC
+    [ convert streamHeader
+    , convert streamFormat
+    ]
+
+instance Convertible Stream Atom where
+  safeConvert = convertVia (undefined :: List)
+
+instance Binary Stream where
+  put s = put (convert s :: List)
+  get = do
+    lst <- get :: Get List
+    either (fail . prettyConvertError) return $ safeConvert lst

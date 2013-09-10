@@ -137,6 +137,9 @@ instance Binary BitmapInfo where
 instance Convertible Chunk BitmapInfo where
   safeConvert = decodeChunk formatCC
 
+instance Convertible BitmapInfo Chunk where
+  safeConvert = encodeChunk formatCC
+
 {-----------------------------------------------------------------------
 -- WaveFormatX
 -----------------------------------------------------------------------}
@@ -202,8 +205,11 @@ instance Binary WaveFormatX where
 instance Convertible Chunk WaveFormatX where
   safeConvert = decodeChunk formatCC
 
+instance Convertible WaveFormatX Chunk where
+  safeConvert = encodeChunk formatCC
+
 {-----------------------------------------------------------------------
--- WaveFormatX
+-- Stream Format
 -----------------------------------------------------------------------}
 
 -- | Format description used in audio and video streams.
@@ -220,4 +226,12 @@ instance Convertible Chunk Format where
       n  -> convError ("unexpected chunk size" ++ show n) c
 
 instance Convertible Atom Format where
+  safeConvert = convertVia (undefined :: Chunk)
+
+-- should never fail
+instance Convertible Format Chunk where
+  safeConvert (VideoFormat bi) = safeConvert bi
+  safeConvert (AudioFormat wf) = safeConvert wf
+
+instance Convertible Format Atom where
   safeConvert = convertVia (undefined :: Chunk)

@@ -33,10 +33,12 @@ module Codec.AVI.RIFF
        , Chunk (..)
        , ppChunk
        , decodeChunk
+       , encodeChunk
 
          -- * List
        , List  (..)
        , ppList
+       , list
        , lookupList
 
          -- * Atom
@@ -146,6 +148,7 @@ checkCC ex = do
   Chunk
 -----------------------------------------------------------------------}
 
+-- TODO chunkData :: Lazy.ByteString ?
 data Chunk = Chunk
   { chunkType :: {-# UNPACK #-} !FourCC
   , chunkData :: {-# UNPACK #-} !ByteString
@@ -185,6 +188,12 @@ decodeChunk ex c @ Chunk {..}
   | ex == chunkType = return $ decode $ LBS.fromChunks [chunkData]
   |    otherwise    = convError "unexpected chunk type" c
 
+encodeChunk :: Binary a => FourCC -> a -> ConvertResult Chunk
+encodeChunk ty x = return $ Chunk
+  { chunkType = ty
+  , chunkData = LBS.toStrict $ encode x
+  }
+
 {-----------------------------------------------------------------------
   List
 -----------------------------------------------------------------------}
@@ -195,6 +204,15 @@ data List = List
   , children :: [Atom]
   } deriving (Show, Eq, Typeable)
 
+-- | Safe constructor.
+list :: FourCC -> [Atom] -> List
+list ty cs = List
+  { listSize = L.sum $ L.map binarySize cs
+  , listType = ty
+  , children = cs
+  }
+
+-- | RIFF list identifier.
 listCC :: FourCC
 listCC = "LIST"
 

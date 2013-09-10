@@ -201,3 +201,10 @@ instance Convertible Chunk Header where
 
 instance Convertible Atom Header where
   safeConvert = convertVia (undefined :: Chunk)
+
+-- should never fail
+instance Convertible Header Chunk where
+  safeConvert = encodeChunk headerCC
+
+instance Convertible Header Atom where
+  safeConvert = convertVia (undefined :: Chunk)
