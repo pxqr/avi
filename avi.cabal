@@ -19,7 +19,7 @@ source-repository head
   location:            git://github.com/pxqr/avi.git
 
 flag examples
-  description:         Whether build examples.
+  description:         Whether to build examples.
   default:             False
 
 
