@@ -5,6 +5,9 @@
 --   Stability   :  stable
 --   Portability :  portable
 --
+--   Each stream contain mandatory /stream format chunk/, one per
+--   stream list. The stream format chunk describes the format of the
+--   embedded data in the stream.
 --
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -30,6 +33,7 @@ import Data.Typeable
 
 import Codec.AVI.RIFF
 
+-- | Identifier of stream format chunk.
 formatCC :: FourCC
 formatCC = "strf"
 
@@ -37,27 +41,47 @@ formatCC = "strf"
 -- BITMAPINFOHEADER
 -----------------------------------------------------------------------}
 
--- | BitmapInfo is used for stream format for video stream. For
--- BITMAPINFOHEADER reference see:
+-- | Format description used in video streams. For BITMAPINFOHEADER
+-- reference see:
 --
 --   <http://msdn.microsoft.com/en-us/library/windows/desktop/dd318229(v=vs.85).aspx>
 --
 data BitmapInfo = BitmapInfo
-  { biSize   :: {-# UNPACK #-} !Word32
+  { -- | Number of bytes required by the structure.
+    --   TODO remove reduntant field
+    biSize   :: {-# UNPACK #-} !Word32
+
+    -- | The width of the bitmap, in pixels.
   , biWidth  :: {-# UNPACK #-} !Word32
+
+    -- | Height of the bitmap, in pixels.
   , biHeight :: {-# UNPACK #-} !Word32
 
+
+    -- | Number of planes for the target device.
+    --   For video stream this value should be equal to 1.
   , biPlanes      :: {-# UNPACK #-} !Word16
+    -- | Number of bits per pixel.
   , biBitCount    :: {-# UNPACK #-} !Word16
+    -- |
   , biCompression :: {-# UNPACK #-} !Word32
 
+    -- | Size of the image in bytes. Can be equal to 0 for an
+    -- uncompressed RGB bitmap.
   , biSizeImage     :: {-# UNPACK #-} !Word32
+    -- | Horizontal resolution, in pixels per meter.
   , biXPelsPerMeter :: {-# UNPACK #-} !Word32
+    -- | Vertical resolution, in pixels per meter.
   , biYPelsPerMeter :: {-# UNPACK #-} !Word32
 
+    -- | Number of color indices in the color table that are actually
+    -- used by the bitmap.
   , biClrUsed      :: {-# UNPACK #-} !Word32
+    -- | Number of color indices considered important.
   , biClrImportant :: {-# UNPACK #-} !Word32
   } deriving (Show, Eq, Typeable)
+
+-- TODO decode/encode color table
 
 instance BinarySize BitmapInfo where
   {-# INLINE binarySize #-}
@@ -117,18 +141,30 @@ instance Convertible Chunk BitmapInfo where
 -- WaveFormatX
 -----------------------------------------------------------------------}
 
--- |
+-- | Format description used in audio streams. For the header
+-- reference see:
+--
 -- <http://msdn.microsoft.com/en-us/library/windows/desktop/dd390970(v=vs.85).aspx>
 --
 data WaveFormatX = WaveFormatX
-  { formatTag      :: {-# UNPACK #-} !Word16
+  { -- | Waveform-audio format type. TODO make enum
+    formatTag      :: {-# UNPACK #-} !Word16
+    -- | Number of channels: mono — 1, stereo — 2, etc.
   , channels       :: {-# UNPACK #-} !Word16
 
+    -- | Sample rate: 11.025 kHz, 22.05 kHz, 44.1 kHz, etc.
   , samplesPerSec  :: {-# UNPACK #-} !Word32
+    -- | Required average data-transfer rate.
   , avgBytesPerSec :: {-# UNPACK #-} !Word32
 
+    -- | The block alignment is the minimum atomic unit of data for
+    -- the formatTag format type.
   , blockAlign     :: {-# UNPACK #-} !Word16
+    -- | Bits per sample for the 'formatTag' format type.
   , bitsPerSample  :: {-# UNPACK #-} !Word16
+
+    -- | Size, in bytes, of extra format information appended to the
+    -- end of the structure.
   , cbSize         :: {-# UNPACK #-} !Word16
   } deriving (Show, Eq, Typeable)
 
@@ -170,6 +206,7 @@ instance Convertible Chunk WaveFormatX where
 -- WaveFormatX
 -----------------------------------------------------------------------}
 
+-- | Format description used in audio and video streams.
 data Format
   = VideoFormat BitmapInfo
   | AudioFormat WaveFormatX
