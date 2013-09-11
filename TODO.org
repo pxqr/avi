@@ -1,5 +1,5 @@
 * TODO examples
 ** DONE riff index viewer
-** TODO avi info
 ** TODO JUNK cleaner
+** TODO avi info
 ** TODO subtitle, video, audio extractor

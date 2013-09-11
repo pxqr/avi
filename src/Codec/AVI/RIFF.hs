@@ -29,6 +29,10 @@ module Codec.AVI.RIFF
        ( BinarySize (..) -- TODO more to Internal.hs
        , FourCC
 
+         -- * JUNK
+       , junkCC
+       , HasJUNK (..)
+
          -- * Chunk
        , Chunk (..)
        , ppChunk
@@ -145,6 +149,20 @@ checkCC ex = do
     fail $ "expected " ++ show ex ++ " but actual " ++ show ac
 
 {-----------------------------------------------------------------------
+  JUNK
+-----------------------------------------------------------------------}
+
+-- | Applications should ignore the content of JUNK chunks — they are
+-- used for alignment.
+junkCC :: FourCC
+junkCC = "JUNK"
+
+-- | 'Atom's which can have a JUNK('junkCC') chunk.
+class HasJUNK a where
+  -- | Remove all JUNK chunks from an RIFF atom.
+  clean :: a -> a
+
+{-----------------------------------------------------------------------
   Chunk
 -----------------------------------------------------------------------}
 
@@ -204,6 +222,10 @@ data List = List
   , children :: [Atom]
   } deriving (Show, Eq, Typeable)
 
+instance HasJUNK List where
+  clean List {..}
+    = list listType $ L.filter ((==) junkCC . atomType) children
+
 -- | Safe constructor.
 list :: FourCC -> [Atom] -> List
 list ty cs = List
@@ -261,6 +283,10 @@ data AtomG a = AChunk !a
 
 type Atom = AtomG Chunk
 
+instance HasJUNK Atom where
+  clean (AList  xs) = AList  (clean xs)
+  clean (AChunk c ) = AChunk c
+
 instance BinarySize Atom where
   binarySize (AChunk c) = binarySize c
   binarySize (AList  l) = binarySize l
@@ -302,6 +328,7 @@ atomType (AList  List  {..}) = listType
 newtype RIFF = RIFF List
                deriving (Show, Eq, Typeable)
 
+-- | RIFF identifier.
 riffCC :: FourCC
 riffCC = "RIFF"
 
@@ -314,7 +341,8 @@ instance Binary RIFF where
     put riffCC
     put lst
 
--- TODO filter JUNK chunks
+instance HasJUNK RIFF where
+  clean (RIFF a) = RIFF (clean a)
 
 {-----------------------------------------------------------------------
   Pretty printing
@@ -334,7 +362,7 @@ ppList List {..}
 -- | Format an 'Atom' in human readable form omitting binary data.
 ppAtom :: Atom -> Doc
 ppAtom (AChunk chunk) = ppChunk chunk
-ppAtom (AList  list)  = ppList  list
+ppAtom (AList  lst)   = ppList  lst
 
 ppRIFF :: RIFF -> Doc
 ppRIFF (RIFF lst) = ppList lst
