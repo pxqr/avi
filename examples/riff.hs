@@ -1,4 +1,4 @@
--- | This program write a RIFF
+-- | This program write a RIFF file structure to stdout.
 module Main (main) where
 
 import Codec.AVI.RIFF
