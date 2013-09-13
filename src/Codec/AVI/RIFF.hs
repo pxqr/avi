@@ -95,6 +95,7 @@ instance BinarySize Word32
 instance BinarySize Word64
 
 instance BinarySize Int where
+  {-# INLINE binarySize #-}
   binarySize _ = 4
 
 instance BinarySize ByteString where
@@ -110,7 +111,7 @@ getSized :: (Binary a, BinarySize a) => Int -> Get [a]
 getSized n
   |   n <= 0  = pure []
   | otherwise = do
-    x  <- get -- :: Get a
+    x  <- get
     xs <- getSized (n - binarySize x)
     pure (x : xs)
 
@@ -229,10 +230,18 @@ chunkInfo Chunk {..} = ChunkInfo
 instance Show Chunk where
   showsPrec i = showsPrec i . chunkInfo
 
+{-# INLINE zeroTrailing #-}
+zeroTrailing :: Int -> Int -> Int
+zeroTrailing n x = (x `shiftR` n) `shiftL` n
+
+roundUp :: Int -> Int
+roundUp x = zeroTrailing 1 (x + 1)
+
 instance Binary Chunk where
   get = Chunk
     <$> get
-    <*> (getWord32le >>= getLazyByteString . fromIntegral)
+    <*> (getWord32le >>= getLazyByteString
+              . fromIntegral . roundUp . fromIntegral)
 
   put Chunk {..} = do
     put chunkType
@@ -300,7 +309,7 @@ instance Binary List where
     getListBody
 
   put lst = do
-    put  listCC
+    put listCC
     putListBody lst
 
 lookupList :: FourCC -> [Atom] -> ConvertResult Atom
@@ -313,11 +322,10 @@ lookupList ty e      = convError ("could not lookup: " ++ show ty) e
   Atom
 -----------------------------------------------------------------------}
 
-data AtomG a = AChunk !a
-             | AList  !List
-               deriving ( Show, Eq, Typeable
-                        , Functor, Foldable, Traversable
-                        )
+data AtomG a
+  = AChunk !a
+  | AList  !List
+    deriving (Show, Eq, Typeable, Functor, Foldable, Traversable)
 
 type Atom = AtomG Chunk
 
