@@ -109,31 +109,31 @@ instance Convertible Codec.AVI.Header Atom where
 -----------------------------------------------------------------------}
 
 data ContentType
-  = UncompressedVideo
+  = Audio
+  | UncompressedVideo
   | CompressedVideo
   | PaletteChange
-  | Audio
-  | UnknownContent TwoCC
+  | Text TwoCC
     deriving (Show, Eq, Ord, Typeable)
 
 instance Binary ContentType where
   get = tccToCTy <$> get
     where
       tccToCTy :: TwoCC -> ContentType
+      tccToCTy "wb" = Audio
       tccToCTy "db" = UncompressedVideo
       tccToCTy "dc" = CompressedVideo
       tccToCTy "pc" = PaletteChange
-      tccToCTy "wb" = Audio
-      tccToCTy  cc  = UnknownContent cc
+      tccToCTy  cc  = Text cc
 
   put = put . cTyToTcc
     where
       cTyToTcc :: ContentType -> TwoCC
+      cTyToTcc  Audio              = "wb"
       cTyToTcc  UncompressedVideo  = "db"
       cTyToTcc  CompressedVideo    = "dc"
       cTyToTcc  PaletteChange      = "pc"
-      cTyToTcc  Audio              = "wb"
-      cTyToTcc (UnknownContent cc) = cc
+      cTyToTcc (Text cc)           = cc
 
 -- | Index version 1 identifier.
 idx1CC :: FourCC
