@@ -193,9 +193,13 @@ aviCC = "AVI "
 avix :: FourCC
 avix = "AVIX"
 
--- | Identifier of stream LIST.
+-- | Stream LIST identifier.
 headerListCC :: FourCC
 headerListCC = "hdrl"
+
+-- | AVI payload data identifier.
+movi :: FourCC
+movi = "movi"
 
 data AVI = AVI
   { header  :: Codec.AVI.Header
