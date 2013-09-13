@@ -26,7 +26,7 @@ import Control.Applicative
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.ByteString as BS
+import Data.ByteString.Lazy as LBS
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.Typeable
@@ -220,7 +220,7 @@ data Format
 
 instance Convertible Chunk Format where
   safeConvert c @ Chunk {..} =
-    case BS.length chunkData of
+    case LBS.length chunkData of
       40 -> VideoFormat <$> safeConvert c
       18 -> AudioFormat <$> safeConvert c
       n  -> convError ("unexpected chunk size" ++ show n) c

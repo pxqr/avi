@@ -68,6 +68,7 @@ import Data.Bits
 import Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Convertible.Base
+import Data.Int
 import Data.Foldable
 import Data.List as L
 import Data.String
@@ -99,6 +100,10 @@ instance BinarySize Int where
 instance BinarySize ByteString where
   {-# INLINE binarySize #-}
   binarySize bs = 4 + BS.length bs
+
+instance BinarySize LBS.ByteString where
+  {-# INLINE binarySize #-}
+  binarySize bs = 4 + fromIntegral (LBS.length bs)
 
 
 getSized :: (Binary a, BinarySize a) => Int -> Get [a]
@@ -200,10 +205,9 @@ class HasJUNK a where
   Chunk
 -----------------------------------------------------------------------}
 
--- TODO chunkData :: Lazy.ByteString ?
 data Chunk = Chunk
   { chunkType :: {-# UNPACK #-} !FourCC
-  , chunkData :: {-# UNPACK #-} !ByteString
+  , chunkData :: !LBS.ByteString
   } deriving (Eq, Typeable)
 
 instance BinarySize Chunk where
@@ -213,13 +217,13 @@ instance BinarySize Chunk where
 -- | for Show instance only
 data ChunkInfo = ChunkInfo
   { ckType :: {-# UNPACK #-} !FourCC
-  , ckSize :: {-# UNPACK #-} !Int
+  , ckSize :: {-# UNPACK #-} !Int64
   } deriving Show
 
 chunkInfo :: Chunk -> ChunkInfo
 chunkInfo Chunk {..} = ChunkInfo
   { ckType = chunkType
-  , ckSize = BS.length chunkData
+  , ckSize = LBS.length chunkData
   }
 
 instance Show Chunk where
@@ -228,22 +232,22 @@ instance Show Chunk where
 instance Binary Chunk where
   get = Chunk
     <$> get
-    <*> (getWord32le >>= getByteString . fromIntegral)
+    <*> (getWord32le >>= getLazyByteString . fromIntegral)
 
   put Chunk {..} = do
     put chunkType
-    put $ BS.length chunkData
-    putByteString   chunkData
+    put $ LBS.length chunkData
+    putLazyByteString   chunkData
 
 decodeChunk :: (Typeable a, Binary a) => FourCC -> Chunk -> ConvertResult a
 decodeChunk ex c @ Chunk {..}
-  | ex == chunkType = return $ decode $ LBS.fromChunks [chunkData]
+  | ex == chunkType = return $ decode chunkData
   |    otherwise    = convError "unexpected chunk type" c
 
 encodeChunk :: Binary a => FourCC -> a -> ConvertResult Chunk
 encodeChunk ty x = return $ Chunk
   { chunkType = ty
-  , chunkData = LBS.toStrict $ encode x
+  , chunkData = encode x
   }
 
 {-----------------------------------------------------------------------
@@ -385,7 +389,7 @@ instance HasJUNK RIFF where
 -- | Format a 'Chunk' in human readable form omitting binary data.
 ppChunk :: Chunk -> Doc
 ppChunk Chunk {..}
-  = text (show chunkType) <+> int (BS.length chunkData)
+  = text (show chunkType) <+> text (show (LBS.length chunkData))
 
 -- | Format a 'List' in human readable form omitting binary data.
 ppList :: List -> Doc
