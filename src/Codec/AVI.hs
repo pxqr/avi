@@ -25,10 +25,11 @@ module Codec.AVI
 import Control.Applicative
 import Data.Binary
 import Data.Binary.Get
-import qualified Data.ByteString.Lazy as LBS
+import Data.Binary.Put
 import Data.Convertible.Base
 import Data.Convertible.Utils
 import Data.List as L
+import Data.Maybe
 import Data.Typeable
 
 import Codec.AVI.RIFF
@@ -103,12 +104,83 @@ instance Convertible Codec.AVI.Header Chunk where
 instance Convertible Codec.AVI.Header Atom where
   safeConvert = convertVia (undefined :: Chunk)
 
+{-----------------------------------------------------------------------
+  AVIOLDINDEX
+-----------------------------------------------------------------------}
+
+data ContentType
+  = UncompressedVideo
+  | CompressedVideo
+  | PaletteChange
+  | Audio
+  | UnknownContent TwoCC
+    deriving (Show, Eq, Ord, Typeable)
+
+instance Binary ContentType where
+  get = tccToCTy <$> get
+    where
+      tccToCTy :: TwoCC -> ContentType
+      tccToCTy "db" = UncompressedVideo
+      tccToCTy "dc" = CompressedVideo
+      tccToCTy "pc" = PaletteChange
+      tccToCTy "wb" = Audio
+      tccToCTy  cc  = UnknownContent cc
+
+  put = put . cTyToTcc
+    where
+      cTyToTcc :: ContentType -> TwoCC
+      cTyToTcc  UncompressedVideo  = "db"
+      cTyToTcc  CompressedVideo    = "dc"
+      cTyToTcc  PaletteChange      = "pc"
+      cTyToTcc  Audio              = "wb"
+      cTyToTcc (UnknownContent cc) = cc
+
+-- | Index version 1 identifier.
+idx1CC :: FourCC
+idx1CC = "idx1"
+
+-- | http://msdn.microsoft.com/en-us/library/windows/desktop/dd318181(v=vs.85).aspx
 data Idx1 = Idx1
-  { chunkId     :: {-# UNPACK #-} !Word32
+  { -- |
+    streamIx    :: {-# UNPACK #-} !Word16
+  , streamType  :: !ContentType
+
+    -- | TODO
   , idx1Flags   :: {-# UNPACK #-} !Word32
+
+    -- | Offset from the start of the movi list, in bytes.
   , chunkOffset :: {-# UNPACK #-} !Word32
+
+    -- | Size of the data chunk starting from 'chunkOffset', in bytes.
   , chunkLength :: {-# UNPACK #-} !Word32
-  } deriving Show
+  } deriving (Show, Eq, Typeable)
+
+instance Binary Idx1 where
+  get = Idx1
+     <$> getWord16le
+     <*> get
+     <*> getWord32le
+     <*> getWord32le
+     <*> getWord32le
+
+  put Idx1 {..} = do
+    putWord16le streamIx
+    put         streamType
+    putWord32le idx1Flags
+    putWord32le chunkOffset
+    putWord32le chunkLength
+
+instance Convertible Chunk Idx1 where
+  safeConvert = decodeChunk idx1CC
+
+instance Convertible Atom Idx1 where
+  safeConvert = convertVia (undefined :: Chunk)
+
+instance Convertible Idx1 Chunk where
+  safeConvert = encodeChunk idx1CC
+
+instance Convertible Idx1 Atom where
+  safeConvert = convertVia (undefined :: Chunk)
 
 {-----------------------------------------------------------------------
   AVI
@@ -128,7 +200,11 @@ headerListCC = "hdrl"
 data AVI = AVI
   { header  :: Codec.AVI.Header
   , streams :: [Stream]
+  , index   :: Maybe Idx1
   } deriving (Show, Typeable)
+
+convMaybe :: ConvertResult a -> ConvertResult (Maybe a)
+convMaybe = pure . either (const Nothing) Just
 
 instance Convertible RIFF AVI where
   safeConvert xs @ (RIFF List {..})
@@ -137,14 +213,17 @@ instance Convertible RIFF AVI where
     |    otherwise    = AVI
       <$> (safeConvert =<< lookupList aviHeaderCC hdrl)
       <*> (mapM safeConvert $ L.filter ((streamCC ==) . atomType) hdrl)
+      <*> convMaybe (safeConvert =<< lookupList idx1CC children)
     where
       Right (AList (List {children = hdrl})) = lookupList headerListCC children
 
 instance Convertible AVI RIFF where
-  safeConvert AVI {..} = pure $ RIFF $ list aviCC
-    [ convert header
-    , convert $ list headerListCC $ L.map convert streams
-    ]
+  safeConvert AVI {..} = pure $ RIFF $ list aviCC xs
+    where
+      xs =
+        [ convert header
+        , convert $ list headerListCC $ L.map convert streams
+        ] ++ maybeToList (convert <$> index)
 
 instance Binary AVI where
   get = do

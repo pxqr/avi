@@ -27,6 +27,9 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 module Codec.AVI.RIFF
        ( BinarySize (..) -- TODO more to Internal.hs
+
+         -- * Character codes
+       , TwoCC
        , FourCC
 
          -- * JUNK
@@ -105,6 +108,37 @@ getSized n
     x  <- get -- :: Get a
     xs <- getSized (n - binarySize x)
     pure (x : xs)
+
+{-----------------------------------------------------------------------
+  Two Character Code
+-----------------------------------------------------------------------}
+
+newtype TwoCC = TwoCC { twoCC :: Word16 }
+                deriving (Eq, Ord, Typeable)
+
+instance BinarySize TwoCC where
+  {-# INLINE binarySize #-}
+  binarySize _ = 2
+
+instance IsString TwoCC where
+  {-# INLINE fromString #-}
+  fromString [a, b] = TwoCC $
+    fromIntegral  (fromEnum a .&. 0xff) .|.
+    fromIntegral ((fromEnum b .&. 0xff) `shiftL` 8)
+  fromString _ = error "fromString: TwoCC should be 2 characters long"
+
+instance Show TwoCC where
+  show (TwoCC x) =
+    [ toEnum $ fromIntegral  (x .&. 0xff)
+    , toEnum $ fromIntegral ((x `shiftR` 8) .&. 0xff)
+    ]
+
+instance Binary TwoCC where
+  get = TwoCC <$> getWord16le
+  {-# INLINE get #-}
+
+  put = putWord16le . twoCC
+  {-# INLINE put #-}
 
 {-----------------------------------------------------------------------
   Four Character Code
